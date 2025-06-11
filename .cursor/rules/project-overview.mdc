@@ -1,0 +1,54 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+What already Set Up:
+
+Initialized a Shopify app using the official Shopify CLI (Remix + App Bridge template).
+
+Integrated Polaris (Shopify’s design system) for UI and App Bridge for embedding the app into the Shopify Admin.
+
+Installed the app into your development store (e.g., skm-kart.myshopify.com).
+
+Confirmed GraphiQL works at http://localhost:3457/graphiql — you can query the Admin GraphQL API.
+
+Verified Remix frontend works independently at http://localhost:60595/hello.
+
+🧠 What i Want to Build:
+
+i want to build a full AI-powered plugin for any Shopify store that:
+
+Adds a conversational UI/chatbot into the storefront.
+
+Enables users to search, browse, add to cart, and checkout — all through the chat interface.
+
+Uses Claude (Anthropic LLM) to understand user input and generate appropriate responses.
+
+Uses Model Context Protocol (MCP) to let Claude call webhooks that your app will expose to:
+
+Query products
+
+Create carts
+
+Add/remove line items
+
+Begin checkout
+
+Show order status, etc.
+
+final Goal Architecture Summary:
+
+Claude (via chat) decides user intent.
+
+Sends tool_use call to your /api/mcp.
+
+Your /api/mcp handles the action using Shopify API.
+
+Responds with structured output
+
+
+
+
+
+
