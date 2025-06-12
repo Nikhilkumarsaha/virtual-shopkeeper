@@ -1,7 +1,7 @@
 import type { LoaderFunction } from '@remix-run/node';
 import { json } from '@remix-run/node';
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export const loader: LoaderFunction = async () => {
   // Placeholder loader, can fetch user/session info if needed
@@ -37,6 +37,72 @@ export default function AssistantRoute() {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerPassword, setCustomerPassword] = useState('');
+  const [customerToken, setCustomerToken] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState('');
+
+  // Persistent cart ID management
+  function getCartId() {
+    return window.localStorage.getItem('shop-assistant-cart-id');
+  }
+  function setCartId(cartId: string) {
+    window.localStorage.setItem('shop-assistant-cart-id', cartId);
+  }
+
+  // Scaffold: Get customer access token if customer login is implemented
+  function getCustomerAccessToken() {
+    return window.localStorage.getItem('shop-customer-access-token');
+  }
+  function setCustomerAccessToken(token: string) {
+    window.localStorage.setItem('shop-customer-access-token', token);
+    setCustomerToken(token);
+  }
+  function clearCustomerAccessToken() {
+    window.localStorage.removeItem('shop-customer-access-token');
+    setCustomerToken(null);
+  }
+
+  // On mount, check for customer token
+  useEffect(() => {
+    const token = getCustomerAccessToken();
+    if (token) {
+      setCustomerToken(token);
+      // Fetch active cart as before
+      fetch('/api/get-active-cart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerAccessToken: token }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.cartId) setCartId(data.cartId);
+        });
+    }
+  }, []);
+
+  // Customer login handler
+  async function handleCustomerLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setLoginError('');
+    try {
+      const res = await fetch('/api/customer-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: customerEmail, password: customerPassword }),
+      });
+      const data = await res.json();
+      if (data.accessToken) {
+        setCustomerAccessToken(data.accessToken);
+        setCustomerEmail('');
+        setCustomerPassword('');
+      } else {
+        setLoginError(data.error || 'Login failed');
+      }
+    } catch (err) {
+      setLoginError('Login failed');
+    }
+  }
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
@@ -62,13 +128,47 @@ export default function AssistantRoute() {
         setLoading(false);
         return;
       }
-      // 2. Call /api/mcp with the detected tool_use
+
+      // 2. Inject cartId from localStorage if needed
+      let toolUse = { ...intentData.tool_use };
+      const cartId = typeof window !== 'undefined' ? getCartId() : null;
+      if (
+        ['add_to_cart', 'remove_from_cart', 'begin_checkout'].includes(toolUse.name) &&
+        cartId &&
+        (!toolUse.parameters || !toolUse.parameters.cartId)
+      ) {
+        toolUse = {
+          ...toolUse,
+          parameters: {
+            ...toolUse.parameters,
+            cartId,
+          },
+        };
+      }
+
+      // 3. Call /api/mcp with the detected tool_use
       const mcpRes = await fetch('/api/mcp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tool_use: intentData.tool_use }),
+        body: JSON.stringify({ tool_use: toolUse }),
       });
       const mcpData = await mcpRes.json();
+
+      // 4. If a new cart is created or returned, store its ID
+      if (toolUse.name === 'create_cart' && mcpData.cart && mcpData.cart.id) {
+        setCartId(mcpData.cart.id);
+      }
+      if (toolUse.name === 'add_to_cart' && mcpData.cart && mcpData.cart.id) {
+        setCartId(mcpData.cart.id);
+      }
+      if (toolUse.name === 'remove_from_cart' && mcpData.cart && mcpData.cart.id) {
+        setCartId(mcpData.cart.id);
+      }
+      // Optionally clear cartId if checkout is completed (not implemented here)
+      if (toolUse.name === 'begin_checkout' && mcpData.checkoutUrl) {
+        window.localStorage.removeItem('shop-assistant-cart-id');
+      }
+
       setMessages((msgs) => [
         ...msgs,
         { from: 'assistant', message: JSON.stringify(mcpData, null, 2) },
@@ -86,6 +186,36 @@ export default function AssistantRoute() {
   return (
     <div style={{ maxWidth: 600, margin: '2rem auto', padding: 24 }}>
       <h1>Shop Assistant Chat</h1>
+      {/* Customer Login UI */}
+      {customerToken ? (
+        <div style={{ marginBottom: 16 }}>
+          <span>Logged in as customer</span>
+          <button onClick={clearCustomerAccessToken} style={{ marginLeft: 8 }}>Logout</button>
+        </div>
+      ) : (
+        <form onSubmit={handleCustomerLogin} style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <input
+            type="email"
+            value={customerEmail}
+            onChange={e => setCustomerEmail(e.target.value)}
+            placeholder="Customer Email"
+            required
+            style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #ccc' }}
+          />
+          <input
+            type="password"
+            value={customerPassword}
+            onChange={e => setCustomerPassword(e.target.value)}
+            placeholder="Password"
+            required
+            style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #ccc' }}
+          />
+          <button type="submit" style={{ padding: '8px 16px', borderRadius: 8 }}>
+            Login
+          </button>
+        </form>
+      )}
+      {loginError && <div style={{ color: 'red', marginBottom: 8 }}>{loginError}</div>}
       <div style={{ minHeight: 300, marginBottom: 16 }}>
         {messages.map((msg, i) => (
           <ChatBubble key={i} message={msg.message} from={msg.from as any} />
