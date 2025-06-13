@@ -31,20 +31,7 @@ export const action: ActionFunction = async ({ request }) => {
       case 'query_products': {
         // Example: search products by title substring
         const query = parameters?.query || '';
-        const gql = `#graphql\n{
-          products(first: 10, query: $query) {
-            edges {
-              node {
-                id
-                title
-                handle
-                description
-                images(first: 1) { edges { node { url } } }
-                variants(first: 1) { edges { node { id price } } }
-              }
-            }
-          }
-        }`;
+        const gql = `#graphql\nquery getProducts($query: String!) {\n          products(first: 10, query: $query) {\n            edges {\n              node {\n                id\n                title\n                handle\n                description\n                images(first: 1) { edges { node { url } } }\n                variants(first: 1) { edges { node { id price } } }\n              }\n            }\n          }\n        }`;
         const response = await admin.graphql(gql, { variables: { query } });
         const data = await response.json();
         return json({ products: data.data.products.edges.map((e: { node: any }) => e.node) });

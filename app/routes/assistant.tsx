@@ -154,24 +154,24 @@ export default function AssistantRoute() {
       });
       const mcpData = await mcpRes.json();
 
-      // 4. If a new cart is created or returned, store its ID
-      if (toolUse.name === 'create_cart' && mcpData.cart && mcpData.cart.id) {
-        setCartId(mcpData.cart.id);
-      }
-      if (toolUse.name === 'add_to_cart' && mcpData.cart && mcpData.cart.id) {
-        setCartId(mcpData.cart.id);
-      }
-      if (toolUse.name === 'remove_from_cart' && mcpData.cart && mcpData.cart.id) {
-        setCartId(mcpData.cart.id);
-      }
-      // Optionally clear cartId if checkout is completed (not implemented here)
-      if (toolUse.name === 'begin_checkout' && mcpData.checkoutUrl) {
-        window.localStorage.removeItem('shop-assistant-cart-id');
-      }
+      // 4. Call LLM again to summarize tool result
+      const summaryRes = await fetch('/api/anthropic-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            ...messages,
+            userMessage,
+            { from: 'tool', message: JSON.stringify(mcpData) }
+          ]
+        }),
+      });
+      const summaryData = await summaryRes.json();
+      const finalMessage = summaryData.message || 'Sorry, I could not summarize the result.';
 
       setMessages((msgs) => [
         ...msgs,
-        { from: 'assistant', message: JSON.stringify(mcpData, null, 2) },
+        { from: 'assistant', message: finalMessage },
       ]);
     } catch (err) {
       setMessages((msgs) => [
