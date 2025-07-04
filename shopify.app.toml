@@ -3,7 +3,7 @@
 client_id = "72d5ae318b1e3976f8a37c2890dc114d"
 name = "virtual-shopkeeper"
 handle = "virtual-shopkeeper"
-application_url = "https://stephen-mood-animation-milwaukee.trycloudflare.com"
+application_url = "https://mean-go-les-scene.trycloudflare.com"
 embedded = true
 
 [build]
@@ -23,14 +23,10 @@ api_version = "2025-04"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products"
+scopes = "write_products,write_draft_orders,read_draft_orders"
 
 [auth]
-redirect_urls = [
-  "https://stephen-mood-animation-milwaukee.trycloudflare.com/auth/callback",
-  "https://stephen-mood-animation-milwaukee.trycloudflare.com/auth/shopify/callback",
-  "https://stephen-mood-animation-milwaukee.trycloudflare.com/api/auth/callback"
-]
+redirect_urls = ["https://mean-go-les-scene.trycloudflare.com/auth/callback", "https://mean-go-les-scene.trycloudflare.com/auth/shopify/callback", "https://mean-go-les-scene.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false
