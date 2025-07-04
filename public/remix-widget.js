@@ -1,3 +1,17 @@
+// (function () {
+//   const container = document.getElementById("remix-widget-container");
+//   if (container) {
+//     container.innerHTML = `
+//       <div style="padding:1rem; border:2px solid #ddd;">
+//         <h3>Hello from Remix 🎉</h3>
+//         <p>Content loaded via your local app using ngrok.</p>
+//       </div>
+//     `;
+//   }
+// )
+
+
+
 (function () {
   // Create the chat bubble
   const bubble = document.createElement('div');
@@ -47,7 +61,7 @@
 
   // Iframe for the assistant
   const iframe = document.createElement('iframe');
-  iframe.src = 'https://4e87-2401-4900-8fd2-60e-50f9-f31f-4379-e036.ngrok-free.app /widget-assistant';
+  iframe.src = 'https://rpm-travel-designed-kai.trycloudflare.com/widget-assistant';
   iframe.style.width = '100%';
   iframe.style.height = '100%';
   iframe.style.border = 'none';
