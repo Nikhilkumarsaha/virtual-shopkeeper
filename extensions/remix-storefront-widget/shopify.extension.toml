@@ -1,3 +1,7 @@
 name = "remix-storefront-widget"
 type = "theme"
 
+[[extension_points]]
+target = "online_store_app_embed"
+module = "snippets/remix-widget-embed.liquid"
+
