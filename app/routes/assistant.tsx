@@ -33,14 +33,10 @@ function ChatBubble({ message, from }: { message: string; from: 'user' | 'assist
 
 export default function AssistantRoute() {
   const [messages, setMessages] = useState([
-    { from: 'assistant', message: 'Hi! I am your shop assistant. How can I help you today?' },
+    { from: 'assistant', message: 'Hi! I am Nikhil your shop assistant. How can I help you today?' },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [customerEmail, setCustomerEmail] = useState('');
-  const [customerPassword, setCustomerPassword] = useState('');
-  const [customerToken, setCustomerToken] = useState<string | null>(null);
-  const [loginError, setLoginError] = useState('');
 
   // Persistent cart ID management
   function getCartId() {
@@ -50,59 +46,22 @@ export default function AssistantRoute() {
     window.localStorage.setItem('shop-assistant-cart-id', cartId);
   }
 
-  // Scaffold: Get customer access token if customer login is implemented
-  function getCustomerAccessToken() {
-    return window.localStorage.getItem('shop-customer-access-token');
-  }
-  function setCustomerAccessToken(token: string) {
-    window.localStorage.setItem('shop-customer-access-token', token);
-    setCustomerToken(token);
-  }
-  function clearCustomerAccessToken() {
-    window.localStorage.removeItem('shop-customer-access-token');
-    setCustomerToken(null);
-  }
-
-  // On mount, check for customer token
+  // On mount, fetch active cart if available
   useEffect(() => {
-    const token = getCustomerAccessToken();
-    if (token) {
-      setCustomerToken(token);
-      // Fetch active cart as before
-      fetch('/api/get-active-cart', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerAccessToken: token }),
+    // Fetch active cart on component mount
+    fetch('/api/get-active-cart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.cartId) setCartId(data.cartId);
       })
-        .then(res => res.json())
-        .then(data => {
-          if (data.cartId) setCartId(data.cartId);
-        });
-    }
-  }, []);
-
-  // Customer login handler
-  async function handleCustomerLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setLoginError('');
-    try {
-      const res = await fetch('/api/customer-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: customerEmail, password: customerPassword }),
+      .catch(err => {
+        console.log('No active cart found or error fetching cart');
       });
-      const data = await res.json();
-      if (data.accessToken) {
-        setCustomerAccessToken(data.accessToken);
-        setCustomerEmail('');
-        setCustomerPassword('');
-      } else {
-        setLoginError(data.error || 'Login failed');
-      }
-    } catch (err) {
-      setLoginError('Login failed');
-    }
-  }
+  }, []);
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
@@ -146,8 +105,8 @@ export default function AssistantRoute() {
         };
       }
 
-      // 3. Call /api/mcp with the detected tool_use
-      const mcpRes = await fetch('/api/mcp', {
+      // 3. Call /api/mcp.customer with the detected tool_use (customer-facing)
+      const mcpRes = await fetch('/api/mcp/customer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tool_use: toolUse }),
@@ -186,36 +145,6 @@ export default function AssistantRoute() {
   return (
     <div style={{ maxWidth: 600, margin: '2rem auto', padding: 24 }}>
       <h1>Shop Assistant Chat</h1>
-      {/* Customer Login UI */}
-      {customerToken ? (
-        <div style={{ marginBottom: 16 }}>
-          <span>Logged in as customer</span>
-          <button onClick={clearCustomerAccessToken} style={{ marginLeft: 8 }}>Logout</button>
-        </div>
-      ) : (
-        <form onSubmit={handleCustomerLogin} style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <input
-            type="email"
-            value={customerEmail}
-            onChange={e => setCustomerEmail(e.target.value)}
-            placeholder="Customer Email"
-            required
-            style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #ccc' }}
-          />
-          <input
-            type="password"
-            value={customerPassword}
-            onChange={e => setCustomerPassword(e.target.value)}
-            placeholder="Password"
-            required
-            style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #ccc' }}
-          />
-          <button type="submit" style={{ padding: '8px 16px', borderRadius: 8 }}>
-            Login
-          </button>
-        </form>
-      )}
-      {loginError && <div style={{ color: 'red', marginBottom: 8 }}>{loginError}</div>}
       <div style={{ minHeight: 300, marginBottom: 16 }}>
         {messages.map((msg, i) => (
           <ChatBubble key={i} message={msg.message} from={msg.from as any} />
