@@ -142,7 +142,8 @@ export default function AssistantRoute() {
   const [loginError, setLoginError] = useState('');
   const [customerToken, setCustomerToken] = useState<string | null>(null);
   const [loginSent, setLoginSent] = useState(false);
-  const [lastProducts, setLastProducts] = useState([]);
+  const [lastProducts, setLastProducts] = useState<any[]>([]);
+  const [lastCart, setLastCart] = useState<any>(null);
 
   // Persistent cart ID and customer token management
   function getCartId() {
@@ -292,6 +293,46 @@ export default function AssistantRoute() {
             console.log('No valid lastProducts or variantId to inject.');
           }
         }
+        // For remove_from_cart, ground the lineIds using lastCart and user intent
+        if (toolUse.name === 'remove_from_cart' && lastCart && lastCart.lines && Array.isArray(lastCart.lines.edges)) {
+          const userText = userMessage.message.toLowerCase();
+
+          // Try exact or partial match first
+          let matchingLine = (lastCart.lines.edges as any[]).find((edge: any) => {
+            const productTitle = edge.node.merchandise.product.title.toLowerCase();
+            const variantTitle = edge.node.merchandise.title?.toLowerCase() || '';
+            return (
+              userText === productTitle ||
+              userText === variantTitle ||
+              userText.includes(productTitle) ||
+              userText.includes(variantTitle)
+            );
+          });
+
+          // If no exact/partial match, try substring match
+          if (!matchingLine) {
+            matchingLine = (lastCart.lines.edges as any[]).find((edge: any) => {
+              const productTitle = edge.node.merchandise.product.title.toLowerCase();
+              const variantTitle = edge.node.merchandise.title?.toLowerCase() || '';
+              return (
+                productTitle.includes(userText) ||
+                variantTitle.includes(userText)
+              );
+            });
+          }
+
+          if (matchingLine) {
+            toolUse.parameters.lineIds = [matchingLine.node.id];
+            console.log('Grounded lineIds for remove_from_cart:', toolUse.parameters.lineIds);
+          } else {
+            setMessages((msgs) => [
+              ...msgs,
+              { from: 'assistant', message: 'Sorry, I could not find that product in your cart to remove.' },
+            ]);
+            setLoading(false);
+            return;
+          }
+        }
         console.log('Preparing cart operation tool call:', toolUse);
       }
 
@@ -312,6 +353,11 @@ export default function AssistantRoute() {
       if (toolUse.name === 'query_products' && Array.isArray(mcpData.products)) {
         setLastProducts(mcpData.products);
         console.log('Updated lastProducts from backend:', mcpData.products);
+      }
+      // If this was a cart operation, update lastCart with the backend result
+      if ((toolUse.name === 'get_cart' || toolUse.name === 'add_to_cart' || toolUse.name === 'remove_from_cart') && mcpData.cart) {
+        setLastCart(mcpData.cart);
+        console.log('Updated lastCart from backend:', mcpData.cart);
       }
 
       // 4. Call LLM again to summarize tool result

@@ -46,12 +46,12 @@ export const loader: LoaderFunction = async () => {
       },
       {
         name: 'remove_from_cart',
-        description: 'Remove line items from a cart.',
+        description: 'Remove line items from a cart. The lineIds parameter MUST be the cart line IDs (not product titles, not variant IDs). Use the line IDs from the cart object returned by get_cart.',
         parameters: {
           type: 'object',
           properties: {
             cartId: { type: 'string', description: 'Cart ID' },
-            lineIds: { type: 'array', description: 'IDs of cart lines to remove', items: { type: 'string' } },
+            lineIds: { type: 'array', description: 'IDs of cart lines to remove. MUST be cart line IDs, not product titles or variant IDs.', items: { type: 'string' } },
           },
           required: ['cartId', 'lineIds'],
         },
