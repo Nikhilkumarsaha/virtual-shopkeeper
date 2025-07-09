@@ -18,10 +18,35 @@ export const action: ActionFunction = async ({ request }) => {
 
   let prompt;
   if (isToolResult) {
-    // Summarization prompt
-    prompt = `You are an AI assistant for a Shopify store. Given the following chat history and the result of a tool call, respond to the user in natural language. Do not include any raw JSON or code blocks. Be concise and helpful.\n\nChat history:\n${messages.slice(0, -1).map((m: { from: string; message: string }) => `${m.from}: ${m.message}`).join('\n')}\n\nTool result:\n${lastMsg.message}\n\nRespond with a helpful message for the user.`;
+    // Summarization prompt with markdown image formatting instructions
+    prompt = `You are an AI assistant for a Shopify store. Given the following chat history and the result of a tool call, respond to the user in natural language.
+If the tool result contains a list of products, always present each product in the following format:
+1. Show the product image as a markdown image: ![alt text](image_url)
+2. Show the product title
+3. Show the price (from the first variant)
+If there are multiple products, list them as:
+1. image, title, price
+2. image, title, price
+...and so on.
+Use markdown image syntax for the product image. Do not include any raw JSON or code blocks. Be concise and helpful.
+
+Chat history:
+${messages.slice(0, -1).map((m: { from: string; message: string }) => `${m.from}: ${m.message}`).join('\n')}
+
+Tool result:
+${lastMsg.message}
+
+Respond with a helpful message for the user, following the above format for product lists.`;
   } else {
-    prompt = `You are an AI assistant for a Shopify store. Given the chat history, extract the user's intent as a tool_use call.\n\nChat history:\n${messages.map((m: { from: string; message: string }) => `${m.from}: ${m.message}`).join('\n')}\n\nRespond ONLY with a single line of valid JSON like {"tool_use": {"name": ..., "parameters": {...}}}.\n\nIMPORTANT:\n- For product search, always use "query_products" as the tool name.\n- For adding to cart, always use "add_to_cart" with parameters: {"cartId": string, "lines": [{"variantId": string, "quantity": number}]}. Do NOT use product_id.\n- Do not include any text, markdown, or code blocks before or after the JSON.`;
+    prompt = `You are an AI assistant for a Shopify store. Given the chat history, extract the user's intent as a tool_use call.If the tool result contains a list of products, always present each product in the following format:
+1. Show the product image (URL)
+2. Show the product title
+3. Show the price (from the first variant)
+If there are multiple products, list them as:
+1. image, title, price
+2. image, title, price
+...and so on.
+\n\nChat history:\n${messages.map((m: { from: string; message: string }) => `${m.from}: ${m.message}`).join('\n')}\n\nRespond ONLY with a single line of valid JSON like {"tool_use": {"name": ..., "parameters": {...}}}.\n\nIMPORTANT:\n- For product search, always use "query_products" as the tool name.\n- For adding to cart, always use "add_to_cart" with parameters: {"cartId": string, "lines": [{"variantId": string, "quantity": number}]}. Do NOT use product_id.\n- For showing, viewing, or displaying the cart, ALWAYS use the tool name "get_cart" with the parameter {"cartId": ...}.\n- Do NOT use "show_cart", "view_cart", or any other tool name for this purpose.\n- Do not include any text, markdown, or code blocks before or after the JSON.`;
   }
 
   const genAI = new GoogleGenAI({ apiKey });

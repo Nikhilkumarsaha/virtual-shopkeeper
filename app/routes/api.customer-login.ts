@@ -3,43 +3,37 @@ import type { ActionFunction } from '@remix-run/node';
 
 export const action: ActionFunction = async ({ request }) => {
   try {
-    const { email, password } = await request.json();
+    const body = await request.json();
+    const { email, password } = body;
     if (!email || !password) {
       return json({ error: 'Missing email or password' }, { status: 400 });
     }
-    // Shopify Storefront API endpoint and token
-    const shop = process.env.SHOPIFY_SHOP;
+    // Call Shopify Storefront API for customerAccessTokenCreate
+    const shop = process.env.SHOPIFY_SHOP_DOMAIN;
     const storefrontToken = process.env.SHOPIFY_STOREFRONT_API_TOKEN;
     if (!shop || !storefrontToken) {
-      return json({ error: 'Shopify Storefront API not configured' }, { status: 500 });
+      return json({ error: 'Shopify configuration missing' }, { status: 500 });
     }
     const endpoint = `https://${shop}/api/2023-10/graphql.json`;
-    const gql = `mutation customerAccessTokenCreate($input: CustomerAccessTokenCreateInput!) {
-      customerAccessTokenCreate(input: $input) {
-        customerAccessToken { accessToken expiresAt }
-        userErrors { field message }
-      }
-    }`;
-    const response = await fetch(endpoint, {
+    const mutation = `mutation customerAccessTokenCreate($input: CustomerAccessTokenCreateInput!) {\n  customerAccessTokenCreate(input: $input) {\n    customerAccessToken {\n      accessToken\n      expiresAt\n    }\n    customerUserErrors {\n      code\n      field\n      message\n    }\n  }\n}`;
+    const variables = { input: { email, password } };
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Shopify-Storefront-Access-Token': storefrontToken,
       },
-      body: JSON.stringify({
-        query: gql,
-        variables: { input: { email, password } },
-      }),
+      body: JSON.stringify({ query: mutation, variables }),
     });
-    const data = await response.json();
-    const result = data.data.customerAccessTokenCreate;
-    if (result.customerAccessToken && result.customerAccessToken.accessToken) {
+    const data = await res.json();
+    const result = data.data?.customerAccessTokenCreate;
+    if (result?.customerAccessToken?.accessToken) {
       return json({ accessToken: result.customerAccessToken.accessToken });
     } else {
-      const errorMsg = result.userErrors && result.userErrors.length > 0 ? result.userErrors[0].message : 'Login failed';
+      const errorMsg = result?.customerUserErrors?.[0]?.message || 'Invalid credentials';
       return json({ error: errorMsg }, { status: 401 });
     }
   } catch (err) {
-    return json({ error: 'Internal server error', details: String(err) }, { status: 500 });
+    return json({ error: 'Failed to login' }, { status: 500 });
   }
 };

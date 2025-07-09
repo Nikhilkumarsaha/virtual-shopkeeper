@@ -78,6 +78,17 @@ export const loader: LoaderFunction = async () => {
           required: ['orderId'],
         },
       },
+      {
+        name: 'get_cart',
+        description: 'Fetch the current cart and its line items by cartId. ALWAYS use "get_cart" for showing, viewing, or displaying the cart. Do NOT use "show_cart", "view_cart", or any other name.',
+        parameters: {
+          type: 'object',
+          properties: {
+            cartId: { type: 'string', description: 'Cart ID' },
+          },
+          required: ['cartId'],
+        },
+      },
     ],
     api: {
       type: 'openapi',

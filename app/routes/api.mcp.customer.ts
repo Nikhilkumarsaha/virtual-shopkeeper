@@ -9,24 +9,12 @@ const TOOL_ACTIONS = [
   'remove_from_cart',
   'begin_checkout',
   'order_status',
+  'get_cart',
 ];
 
-// Helper function to extract customer info from request
-function getCustomerInfo(request: Request) {
-  // Extract customer info from headers or cookies
-  const customerEmail = request.headers.get('x-customer-email');
-  const customerId = request.headers.get('x-customer-id');
-  const customerAccessToken = request.headers.get('x-customer-access-token');
-
-  return {
-    customerEmail,
-    customerId,
-    customerAccessToken,
-  };
-}
 
 // Helper function to make Storefront API calls
-async function storefrontApiCall(query: string, variables: any = {}) {
+async function storefrontApiCall(query: string, variables: any = {}, customerAccessToken?: string) {
   const shop = process.env.SHOPIFY_SHOP_DOMAIN;
   const accessToken = process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN;
 
@@ -34,12 +22,17 @@ async function storefrontApiCall(query: string, variables: any = {}) {
     throw new Error('Missing Shopify storefront configuration');
   }
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Shopify-Storefront-Access-Token': accessToken,
+  };
+  if (customerAccessToken) {
+    headers['Shopify-Storefront-Buyer-Token'] = customerAccessToken;
+  }
+
   const response = await fetch(`https://${shop}/api/2024-01/graphql.json`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Shopify-Storefront-Access-Token': accessToken,
-    },
+    headers,
     body: JSON.stringify({
       query,
       variables,
@@ -68,8 +61,8 @@ export const action: ActionFunction = async ({ request }) => {
       return json({ error: `Unknown tool_use: ${name}` }, { status: 400 });
     }
 
-    // Get customer information from request
-    const customerInfo = getCustomerInfo(request);
+    // Get customer access token from header
+    const customerAccessToken = request.headers.get('x-customer-access-token') || undefined;
 
     switch (name) {
       case 'query_products': {
@@ -110,7 +103,7 @@ export const action: ActionFunction = async ({ request }) => {
             }
           }`;
 
-        const data = await storefrontApiCall(gql, { query, first: 10 });
+        const data = await storefrontApiCall(gql, { query, first: 10 }, customerAccessToken);
 
         return json({
           products: data.data.products.edges.map((edge: any) => edge.node),
@@ -166,7 +159,7 @@ export const action: ActionFunction = async ({ request }) => {
           }))
         };
 
-        const data = await storefrontApiCall(gql, { input });
+        const data = await storefrontApiCall(gql, { input }, customerAccessToken);
 
         if (data.data.cartCreate.userErrors.length > 0) {
           return json({
@@ -234,7 +227,7 @@ export const action: ActionFunction = async ({ request }) => {
           quantity: line.quantity
         }));
 
-        const data = await storefrontApiCall(gql, { cartId, lines: cartLines });
+        const data = await storefrontApiCall(gql, { cartId, lines: cartLines }, customerAccessToken);
 
         if (data.data.cartLinesAdd.userErrors.length > 0) {
           return json({
@@ -296,7 +289,7 @@ export const action: ActionFunction = async ({ request }) => {
             }
           }`;
 
-        const data = await storefrontApiCall(gql, { cartId, lineIds });
+        const data = await storefrontApiCall(gql, { cartId, lineIds }, customerAccessToken);
 
         if (data.data.cartLinesRemove.userErrors.length > 0) {
           return json({
@@ -331,7 +324,7 @@ export const action: ActionFunction = async ({ request }) => {
             }
           }`;
 
-        const data = await storefrontApiCall(gql, { cartId });
+        const data = await storefrontApiCall(gql, { cartId }, customerAccessToken);
 
         if (!data.data.cart) {
           return json({
@@ -365,6 +358,19 @@ export const action: ActionFunction = async ({ request }) => {
             message: 'Order status requires customer authentication'
           },
           action: 'order_status'
+        });
+      }
+
+      case 'get_cart': {
+        const { cartId } = parameters || {};
+        if (!cartId) {
+          return json({ error: 'Cart ID required for get_cart', action: 'get_cart' });
+        }
+        const gql = `#graphql\n          query getCart($id: ID!) {\n            cart(id: $id) {\n              id\n              checkoutUrl\n              totalQuantity\n              lines(first: 20) {\n                edges {\n                  node {\n                    id\n                    quantity\n                    merchandise {\n                      ... on ProductVariant {\n                        id\n                        title\n                        price {\n                          amount\n                          currencyCode\n                        }\n                        product {\n                          title\n                          handle\n                        }\n                      }\n                    }\n                  }\n                }\n              }\n            }\n          }`;
+        const data = await storefrontApiCall(gql, { id: cartId }, customerAccessToken);
+        return json({
+          cart: data.data.cart,
+          action: 'get_cart'
         });
       }
 
