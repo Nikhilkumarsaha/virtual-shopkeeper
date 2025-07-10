@@ -44,7 +44,7 @@ function renderProductList(message: string) {
   const firstProductIdx = lines.findIndex(line => /^(\d+)\.\s*(?:!\[.*\]\(.*\))?/.test(line));
   const intro = firstProductIdx > 0 ? lines.slice(0, firstProductIdx).join(' ') : '';
   const productLines = lines.slice(firstProductIdx).filter(Boolean);
-
+  console.log("11111111111111", productLines);
   // Find the start of each product (line with markdown image or just a number)
   const products = [];
   let i = 0;
@@ -57,7 +57,7 @@ function renderProductList(message: string) {
       let price = productLines[i + 2] || '';
       // Remove leading numbers and dots from title and price
       title = title.replace(/^\d+\.\s*/, '');
-      price = price.replace(/^\d+\.\s*/, '');
+      // price = price.replace(/^\d+\.\s*/, '');
       products.push({
         img: imgLine[3],
         alt: imgLine[2] || 'Product',
@@ -73,7 +73,7 @@ function renderProductList(message: string) {
         let price = productLines[i + 1] || '';
         // Remove leading numbers and dots from title and price
         title = title.replace(/^\d+\.\s*/, '');
-        price = price.replace(/^\d+\.\s*/, '');
+        // price = price.replace(/^\d+\.\s*/, '');
         products.push({
           img: null,
           alt: '',
@@ -269,6 +269,7 @@ export default function AssistantRoute() {
       }
 
       let toolUse = { ...intentData.tool_use };
+      console.log('Tool use detected:', toolUse);
       const cartId = typeof window !== 'undefined' ? getCartId() : null;
       const customerAccessToken = typeof window !== 'undefined' ? getCustomerAccessToken() : null;
 
@@ -283,15 +284,26 @@ export default function AssistantRoute() {
             cartId, // always overwrite with the real cartId from localStorage
           },
         };
-        // For add_to_cart, always inject the first variantId from lastProducts
+        // add_to_cart
         if (toolUse.name === 'add_to_cart') {
-          const firstVariantId = lastProducts[0]?.variants?.edges?.[0]?.node?.id;
-          if (firstVariantId && toolUse.parameters && toolUse.parameters.lines && toolUse.parameters.lines.length > 0) {
-            toolUse.parameters.lines[0].variantId = firstVariantId;
-            console.log('Injecting first variantId from lastProducts:', firstVariantId);
-          } else {
-            console.log('No valid lastProducts or variantId to inject.');
+          const productName = toolUse.parameters?.lines?.[0]?.variantId;
+          console.log('Product name to ground:', productName);
+          const findProduct = lastProducts.find((p: any) => {
+            return p.title.toLowerCase() === productName?.toLowerCase()
+          });
+          console.log('Found producttttttttttttt:', findProduct);
+          const productId = findProduct.variants?.edges?.[0]?.node?.id;
+          if (productId) {
+            toolUse.parameters.lines[0].variantId = productId;
+            console.log('Injecting variantIdddddddddd:', productId);
           }
+        //   const firstVariantId = lastProducts[0]?.variants?.edges?.[0]?.node?.id;
+        //   if (firstVariantId && toolUse.parameters && toolUse.parameters.lines && toolUse.parameters.lines.length > 0) {
+        //     toolUse.parameters.lines[0].variantId = firstVariantId;
+        //     console.log('Injecting first variantId from lastProducts:', firstVariantId);
+        //   } else {
+        //     console.log('No valid lastProducts or variantId to inject.');
+        //   }
         }
         // For remove_from_cart, ground the lineIds using lastCart and user intent
         if (toolUse.name === 'remove_from_cart' && lastCart && lastCart.lines && Array.isArray(lastCart.lines.edges)) {
