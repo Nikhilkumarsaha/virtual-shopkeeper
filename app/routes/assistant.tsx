@@ -404,12 +404,36 @@ export default function AssistantRoute() {
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: '2rem auto', padding: 24 }}>
+    <div style={{ maxWidth: 600, margin: '2rem auto', padding: 24,background: '#ffffff' }}>
       <h1>Shop Assistant Chat</h1>
       {customerToken ? (
         <div style={{ marginBottom: 16 }}>
           <span>Logged in as customer</span>
-          <button onClick={clearCustomerAccessToken} style={{ marginLeft: 8, cursor: 'pointer' }}>Logout</button>
+          <button
+            onClick={clearCustomerAccessToken}
+            style={{
+              marginLeft: 8,
+              cursor: 'pointer',
+              padding: '6px 12px',
+              borderRadius: 6,
+              fontSize: 12,
+              border: '1px solid #e11d48',
+              background: '#fff',
+              color: '#e11d48',
+              fontWeight: 600,
+              transition: 'background 0.2s, color 0.2s, border 0.2s',
+            }}
+            onMouseOver={e => {
+              e.currentTarget.style.background = '#e11d48';
+              e.currentTarget.style.color = '#fff';
+            }}
+            onMouseOut={e => {
+              e.currentTarget.style.background = '#fff';
+              e.currentTarget.style.color = '#e11d48';
+            }}
+          >
+            Logout
+          </button>
         </div>
       ) : (
         !showLogin && (
@@ -421,7 +445,7 @@ export default function AssistantRoute() {
               background: 'linear-gradient(90deg, #6366f1 0%, #60a5fa 100%)',
               color: '#fff',
               border: 'none',
-              borderRadius: 4,
+              borderRadius: 6,
               padding: '6px 14px',
               fontWeight: 600,
               fontSize: 14,
@@ -436,29 +460,73 @@ export default function AssistantRoute() {
         )
       )}
       {showLogin && !customerToken && (
-        <form onSubmit={handleCustomerLogin} style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <input
-            type="email"
-            value={customerEmail}
-            onChange={e => setCustomerEmail(e.target.value)}
-            placeholder="Customer Email"
-            required
-            style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #ccc' }}
-          />
-          <input
-            type="password"
-            value={customerPassword}
-            onChange={e => setCustomerPassword(e.target.value)}
-            placeholder="Password"
-            required
-            style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #ccc' }}
-          />
-          <button type="submit" style={{ padding: '8px 16px', borderRadius: 8, cursor: 'pointer' }}>
-            Login with Shopify
-          </button>
-          <button type="button" onClick={() => setShowLogin(false)} style={{ padding: '8px 16px', borderRadius: 8, cursor: 'pointer' }}>
-            Cancel
-          </button>
+        <form onSubmit={handleCustomerLogin} style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <input
+              type="email"
+              value={customerEmail}
+              onChange={e => setCustomerEmail(e.target.value)}
+              placeholder="Customer Email"
+              required
+              style={{ width: 180, padding: 6, borderRadius: 6, border: '1px solid #ccc', fontSize: 12 }}
+            />
+            <input
+              type="password"
+              value={customerPassword}
+              onChange={e => setCustomerPassword(e.target.value)}
+              placeholder="Password"
+              required
+              style={{ width: 150, padding: 6, borderRadius: 6, border: '1px solid #ccc', fontSize: 12 }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="submit"
+              style={{
+                padding: '6px 12px',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+                background: 'linear-gradient(90deg, #6366f1 0%, #60a5fa 100%)',
+                color: '#fff',
+                border: 'none',
+                boxShadow: '0 2px 8px rgba(99, 102, 241, 0.10)',
+                transition: 'background 0.2s, box-shadow 0.2s',
+              }}
+              onMouseOver={e => (e.currentTarget.style.background = 'linear-gradient(90deg, #4f46e5 0%, #2563eb 100%)')}
+              onMouseOut={e => (e.currentTarget.style.background = 'linear-gradient(90deg, #6366f1 0%, #60a5fa 100%)')}
+            >
+              Login with Shopify
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowLogin(false)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+                background: '#fff',
+                color: '#6366f1',
+                border: '1px solid #6366f1',
+                transition: 'background 0.2s, color 0.2s, border 0.2s',
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.background = '#6366f1';
+                e.currentTarget.style.color = '#fff';
+                e.currentTarget.style.border = '1px solid #6366f1';
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.background = '#fff';
+                e.currentTarget.style.color = '#6366f1';
+                e.currentTarget.style.border = '1px solid #6366f1';
+              }}
+            >
+              Cancel
+            </button>
+          </div>
         </form>
       )}
       {loginSent && <div style={{ color: 'green', marginBottom: 8 }}>Opening Shopify login page...</div>}
@@ -478,7 +546,7 @@ export default function AssistantRoute() {
           style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #ccc' }}
           disabled={loading}
         />
-        <button type="submit" disabled={loading || !input.trim()} style={{ padding: '8px 16px', borderRadius: 8 }}>
+        <button type="submit" disabled={loading || !input.trim()} style={{ padding: '8px 16px', borderRadius: 8,cursor: 'pointer' }}>
           Send
         </button>
       </form>
