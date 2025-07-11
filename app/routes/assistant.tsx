@@ -170,16 +170,19 @@ export default function AssistantRoute() {
     if (token) {
       setCustomerToken(token);
     }
+    const cartId = getCartId();
     fetch('/api/get-active-cart', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customerAccessToken: token }),
+      body: JSON.stringify({ customerAccessToken: token, cartId }),
     })
       .then(res => res.json())
       .then(data => {
-        if (data.cartId) setCartId(data.cartId);
+        if (data.cartId && data.cartId !== cartId) {
+          setCartId(data.cartId);
+        }
       })
-      .catch(() => {});
+      .catch(() => {console.log('Error fetching active cart'); });
   }, []);
 
   // Handle login command or button
@@ -214,7 +217,7 @@ export default function AssistantRoute() {
           const cartRes = await fetch('/api/get-active-cart', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ customerAccessToken: data.accessToken, email: customerEmail }),
+            body: JSON.stringify({ customerAccessToken: data.accessToken, cartId: getCartId() }),
           });
           const cartData = await cartRes.json();
           console.log('Active cart fetch response:', cartData);
