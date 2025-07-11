@@ -29,7 +29,8 @@ If there are multiple products, list them as:
 2. image, title, price
 ...and so on.
 Use markdown image syntax for the product image. Do not include any raw JSON or code blocks. Be concise and helpful and dont show any links or URLs for any results including checkout related functionalities result also.
-During the query products make sure the query results belongs to the similar product title that the user have asked. If it is not similar, then do not include the product in result response
+During the query products make sure the query results belongs to the similar product title that the user have asked. If it is not similar, then do not include the product in result response.
+whenever you summarize the result of an add_to_cart or get_cart action, always list all products in the cart. For each product, show its image, title, price, and quantity.
 Chat history:
 ${messages.slice(0, -1).map((m: { from: string; message: string }) => `${m.from}: ${m.message}`).join('\n')}
 

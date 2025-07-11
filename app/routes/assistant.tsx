@@ -37,14 +37,13 @@ function renderMessageWithImages(message: string) {
 }
 
 function renderProductList(message: string) {
-  // Split into lines and group every 2-3 lines as one product (image, title, price)
+  // Split into lines and group every 2-3 lines as one product (image, title, price, quantity)
   const lines = message.split('\n').map(line => line.trim());
 
   // Find the index of the first product (line with markdown image or just a number)
   const firstProductIdx = lines.findIndex(line => /^(\d+)\.\s*(?:!\[.*\]\(.*\))?/.test(line));
   const intro = firstProductIdx > 0 ? lines.slice(0, firstProductIdx).join(' ') : '';
   const productLines = lines.slice(firstProductIdx).filter(Boolean);
-  console.log("11111111111111", productLines);
   // Find the start of each product (line with markdown image or just a number)
   const products = [];
   let i = 0;
@@ -52,35 +51,47 @@ function renderProductList(message: string) {
     // Look for a line starting with a number and a markdown image
     const imgLine = productLines[i].match(/^(\d+)\.\s*!\[([^\]]*)\]\(([^)]+)\)/);
     if (imgLine) {
-      // Next lines: title and price
+      // Next lines: title, price, quantity (optional)
       let title = productLines[i + 1] || '';
       let price = productLines[i + 2] || '';
+      let quantity = '';
+      // Check if the next line is quantity
+      if (productLines[i + 3] && productLines[i + 3].toLowerCase().startsWith('quantity:')) {
+        quantity = productLines[i + 3].replace(/^quantity:\s*/i, '');
+        i += 4;
+      } else {
+        i += 3;
+      }
       // Remove leading numbers and dots from title and price
       title = title.replace(/^\d+\.\s*/, '');
-      // price = price.replace(/^\d+\.\s*/, '');
       products.push({
         img: imgLine[3],
         alt: imgLine[2] || 'Product',
         title,
         price,
+        quantity,
       });
-      i += 3;
     } else {
-      // Handle products with no image (just number, title, price)
+      // Handle products with no image (just number, title, price, quantity)
       const noImgLine = productLines[i].match(/^(\d+)\.\s*(.*)/);
       if (noImgLine) {
         let title = noImgLine[2] || '';
         let price = productLines[i + 1] || '';
-        // Remove leading numbers and dots from title and price
+        let quantity = '';
+        if (productLines[i + 2] && productLines[i + 2].toLowerCase().startsWith('quantity:')) {
+          quantity = productLines[i + 2].replace(/^quantity:\s*/i, '');
+          i += 3;
+        } else {
+          i += 2;
+        }
         title = title.replace(/^\d+\.\s*/, '');
-        // price = price.replace(/^\d+\.\s*/, '');
         products.push({
           img: null,
           alt: '',
           title,
           price,
+          quantity,
         });
-        i += 2;
       } else {
         i++;
       }
@@ -100,6 +111,9 @@ function renderProductList(message: string) {
           <div>
             <div style={{ fontWeight: 500 }}>{prod.title}</div>
             <div style={{ color: '#555' }}>{prod.price}</div>
+            {prod.quantity && (
+              <div style={{ color: '#888', fontSize: 13 }}>Quantity: {prod.quantity}</div>
+            )}
           </div>
         </div>
       ))}
@@ -144,6 +158,8 @@ export default function AssistantRoute() {
   const [loginSent, setLoginSent] = useState(false);
   const [lastProducts, setLastProducts] = useState<any[]>([]);
   const [lastCart, setLastCart] = useState<any>(null);
+  // Track if the last tool call was get_cart to show the checkout button
+  const [showCheckoutSuggestion, setShowCheckoutSuggestion] = useState(false);
 
   // Persistent cart ID and customer token management
   function getCartId() {
@@ -240,18 +256,20 @@ export default function AssistantRoute() {
     }
   }
 
-  async function handleSend(e: React.FormEvent) {
+  async function handleSend(e: React.FormEvent, overrideInput?: string) {
     e.preventDefault();
-    if (!input.trim()) return;
-    if (input.trim().toLowerCase() === 'login') {
+    const messageToSend = overrideInput !== undefined ? overrideInput : input;
+    if (!messageToSend.trim()) return;
+    if (messageToSend.trim().toLowerCase() === 'login') {
       setShowLogin(true);
       setInput('');
       return;
     }
-    const userMessage = { from: 'user', message: input };
+    const userMessage = { from: 'user', message: messageToSend };
     setMessages((msgs) => [...msgs, userMessage]);
     setInput('');
     setLoading(true);
+    setShowCheckoutSuggestion(false); // Hide suggestion while processing
 
     try {
       // 1. Call our own API route to get tool_use from Anthropic
@@ -395,6 +413,12 @@ export default function AssistantRoute() {
         ...msgs,
         { from: 'assistant', message: finalMessage },
       ]);
+      // Show checkout suggestion if this was a get_cart tool call and cart has items
+      if (toolUse.name === 'get_cart' && mcpData.cart && mcpData.cart.lines && mcpData.cart.lines.edges && mcpData.cart.lines.edges.length > 0) {
+        setShowCheckoutSuggestion(true);
+      } else {
+        setShowCheckoutSuggestion(false);
+      }
     } catch (err) {
       setMessages((msgs) => [
         ...msgs,
@@ -539,6 +563,30 @@ export default function AssistantRoute() {
           <ChatBubble key={i} message={msg.message} from={msg.from as any} />
         ))}
         {loading && <ChatBubble message="Thinking..." from="assistant" />}
+        {/* Proceed to checkout suggestion button */}
+        {showCheckoutSuggestion && !loading && (
+          <div style={{ textAlign: 'left', marginTop: 8 }}>
+            <button
+              onClick={(e) => handleSend(e, 'begin checkout')}
+              style={{
+                background: 'linear-gradient(90deg, #d2d2e9 0%, #bdcbdc 100%)',
+                color: '#000',
+                border: 'none',
+                borderRadius: 6,
+                padding: '6px 12px',
+                fontWeight: 400,
+                fontSize: 14,
+                boxShadow: '0 2px 8px rgba(99, 102, 241, 0.10)',
+                cursor: 'pointer',
+                transition: 'background 0.2s, box-shadow 0.2s',
+              }}
+              onMouseOver={e => (e.currentTarget.style.background = 'linear-gradient(90deg, #908cd6 0%, #7290d1 100%)')}
+              onMouseOut={e => (e.currentTarget.style.background = 'linear-gradient(90deg, #dfdfec 0%, #cbd6e3 100%)')}
+            >
+              Proceed to checkout
+            </button>
+          </div>
+        )}
       </div>
       <form onSubmit={handleSend} style={{ display: 'flex', gap: 8 }}>
         <input
