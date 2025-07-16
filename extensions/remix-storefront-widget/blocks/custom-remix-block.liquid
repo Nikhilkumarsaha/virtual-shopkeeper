@@ -1,6 +1,55 @@
+<script>
+  window.CHATBOT_CUSTOMER = {
+    isLoggedIn: {% if customer %}true{% else %}false{% endif %},
+    id: {{ customer.id | json }},
+    email: {{ customer.email | json }},
+    firstName: {{ customer.first_name | json }},
+    lastName: {{ customer.last_name | json }},
+    name: {{ customer.name | json }}
+  };
+  
+  // Inject cart data from Shopify
+  window.CHATBOT_CART = {
+    id: {{ cart.id | json }},
+    cart: {{ cart | json }},
+    token: {{ cart.token | json }},
+    itemCount: {{ cart.item_count | json }},
+    totalPrice: {{ cart.total_price | json }},
+    currency: {{ cart.currency.iso_code | json }},
+    items: {{ cart.items | json }},
+    // Additional cart properties for better sync
+    note: {{ cart.note | json }},
+    attributes: {{ cart.attributes | json }},
+    original_total_price: {{ cart.original_total_price | json }},
+    total_discount: {{ cart.total_discount | json }},
+    total_weight: {{ cart.total_weight | json }},
+    requires_shipping: {{ cart.requires_shipping | json }}
+  };
+  
+  // Also try to get cart token from cookies/localStorage if available
+  function getCartToken() {
+    // Try to get cart token from cookie (Shopify's default)
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'cart') {
+        return value;
+      }
+    }
+    
+    // Try localStorage as fallback
+    return localStorage.getItem('cart') || localStorage.getItem('shopify-cart-token') || null;
+  }
+  
+  // Store cart token for sync
+  window.CHATBOT_CART_TOKEN = getCartToken();
+  
+  console.log("Shopify cart data injected:", window.CHATBOT_CART);
+  console.log("Cart token from browser:", window.CHATBOT_CART_TOKEN);
+</script>
 <div id="remix-widget-container" style="position: fixed; bottom: 0; right: 0">
 </div>
-<script src="https://rpm-travel-designed-kai.trycloudflare.com/remix-widget.js"></script>
+<script src="https://targets-simulations-administrative-randy.trycloudflare.com/remix-widget.js" defer></script>
 
 {% schema %}
 {

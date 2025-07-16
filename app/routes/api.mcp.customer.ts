@@ -4,17 +4,13 @@ import type { ActionFunction } from '@remix-run/node';
 // Supported tool actions for customers
 const TOOL_ACTIONS = [
   'query_products',
-  'create_cart',
-  'add_to_cart',
-  'remove_from_cart',
   'begin_checkout',
   'order_status',
-  'get_cart',
 ];
 
 
-// Helper function to make Storefront API calls
-async function storefrontApiCall(query: string, variables: any = {}, customerAccessToken?: string) {
+// Helper function to make Storefront API calls (no customer auth needed for basic queries)
+async function storefrontApiCall(query: string, variables: any = {}) {
   const shop = process.env.SHOPIFY_SHOP_DOMAIN;
   const accessToken = process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN;
 
@@ -26,9 +22,6 @@ async function storefrontApiCall(query: string, variables: any = {}, customerAcc
     'Content-Type': 'application/json',
     'X-Shopify-Storefront-Access-Token': accessToken,
   };
-  if (customerAccessToken) {
-    headers['Shopify-Storefront-Buyer-Token'] = customerAccessToken;
-  }
 
   const response = await fetch(`https://${shop}/api/2024-01/graphql.json`, {
     method: 'POST',
@@ -43,7 +36,15 @@ async function storefrontApiCall(query: string, variables: any = {}, customerAcc
     throw new Error(`Storefront API error: ${response.status}`);
   }
 
-  return response.json();
+  const result = await response.json();
+  
+  // Check for GraphQL errors
+  if (result.errors && result.errors.length > 0) {
+    console.error('GraphQL errors:', result.errors);
+    throw new Error(`GraphQL error: ${result.errors[0].message}`);
+  }
+
+  return result;
 }
 
 // Customer-facing MCP endpoint that doesn't require admin authentication
@@ -61,14 +62,14 @@ export const action: ActionFunction = async ({ request }) => {
       return json({ error: `Unknown tool_use: ${name}` }, { status: 400 });
     }
 
-    // Get customer access token from header
-    const customerAccessToken = request.headers.get('x-customer-access-token') || undefined;
+    // Get customer access token from header (not needed for basic queries)
+    // const customerAccessToken = request.headers.get('x-customer-access-token') || undefined;
 
     switch (name) {
       case 'query_products': {
         const query = parameters?.query || '';
 
-        const gql = `#graphql
+        const gql = `
           query searchProducts($query: String!, $first: Int!) {
             products(query: $query, first: $first) {
               edges {
@@ -77,11 +78,15 @@ export const action: ActionFunction = async ({ request }) => {
                   title
                   handle
                   description
-                  images(first: 1) {
+                  media(first: 1) {
                     edges {
                       node {
-                        url
-                        altText
+                        ... on MediaImage {
+                          image {
+                            url
+                            altText
+                          }
+                        }
                       }
                     }
                   }
@@ -103,204 +108,21 @@ export const action: ActionFunction = async ({ request }) => {
             }
           }`;
 
-        const data = await storefrontApiCall(gql, { query, first: 10 }, customerAccessToken);
+        const data = await storefrontApiCall(gql, { query, first: 10 });
+
+        // Ensure we have a valid response structure
+        if (!data?.data?.products?.edges) {
+          return json({
+            error: 'No products found or invalid response structure',
+            action: 'query_products',
+            query
+          });
+        }
 
         return json({
           products: data.data.products.edges.map((edge: any) => edge.node),
           action: 'query_products',
           query
-        });
-      }
-
-      case 'create_cart': {
-        const lines = parameters?.lines || [];
-
-        const gql = `#graphql
-          mutation cartCreate($input: CartInput!) {
-            cartCreate(input: $input) {
-              cart {
-                id
-                checkoutUrl
-                totalQuantity
-                lines(first: 10) {
-                  edges {
-                    node {
-                      id
-                      quantity
-                      merchandise {
-                        ... on ProductVariant {
-                          id
-                          title
-                          price {
-                            amount
-                            currencyCode
-                          }
-                          product {
-                            title
-                            handle
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-              userErrors {
-                field
-                message
-              }
-            }
-          }`;
-
-        const input = {
-          lines: lines.map((line: any) => ({
-            merchandiseId: line.variantId,
-            quantity: line.quantity
-          }))
-        };
-
-        const data = await storefrontApiCall(gql, { input }, customerAccessToken);
-
-        if (data.data.cartCreate.userErrors.length > 0) {
-          return json({
-            error: data.data.cartCreate.userErrors[0].message,
-            action: 'create_cart'
-          });
-        }
-
-        return json({
-          cart: data.data.cartCreate.cart,
-          action: 'create_cart'
-        });
-      }
-
-      case 'add_to_cart': {
-        const { cartId, lines } = parameters || {};
-
-        if (!cartId) {
-          // Create new cart if no cartId provided
-          return json({
-            error: 'Cart ID required for adding items',
-            action: 'add_to_cart'
-          });
-        }
-
-        const gql = `#graphql
-          mutation cartLinesAdd($cartId: ID!, $lines: [CartLineInput!]!) {
-            cartLinesAdd(cartId: $cartId, lines: $lines) {
-              cart {
-                id
-                checkoutUrl
-                totalQuantity
-                lines(first: 10) {
-                  edges {
-                    node {
-                      id
-                      quantity
-                      merchandise {
-                        ... on ProductVariant {
-                          id
-                          title
-                          price {
-                            amount
-                            currencyCode
-                          }
-                          product {
-                            title
-                            handle
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-              userErrors {
-                field
-                message
-              }
-            }
-          }`;
-
-        const cartLines = lines.map((line: any) => ({
-          merchandiseId: line.variantId,
-          quantity: line.quantity
-        }));
-
-        const data = await storefrontApiCall(gql, { cartId, lines: cartLines }, customerAccessToken);
-
-        if (data.data.cartLinesAdd.userErrors.length > 0) {
-          return json({
-            error: data.data.cartLinesAdd.userErrors[0].message,
-            action: 'add_to_cart'
-          });
-        }
-
-        return json({
-          cart: data.data.cartLinesAdd.cart,
-          action: 'add_to_cart'
-        });
-      }
-
-      case 'remove_from_cart': {
-        const { cartId, lineIds } = parameters || {};
-
-        if (!cartId || !lineIds) {
-          return json({
-            error: 'Cart ID and line IDs required',
-            action: 'remove_from_cart'
-          });
-        }
-
-        const gql = `#graphql
-          mutation cartLinesRemove($cartId: ID!, $lineIds: [ID!]!) {
-            cartLinesRemove(cartId: $cartId, lineIds: $lineIds) {
-              cart {
-                id
-                checkoutUrl
-                totalQuantity
-                lines(first: 10) {
-                  edges {
-                    node {
-                      id
-                      quantity
-                      merchandise {
-                        ... on ProductVariant {
-                          id
-                          title
-                          price {
-                            amount
-                            currencyCode
-                          }
-                          product {
-                            title
-                            handle
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-              userErrors {
-                field
-                message
-              }
-            }
-          }`;
-
-        const data = await storefrontApiCall(gql, { cartId, lineIds }, customerAccessToken);
-
-        if (data.data.cartLinesRemove.userErrors.length > 0) {
-          return json({
-            error: data.data.cartLinesRemove.userErrors[0].message,
-            action: 'remove_from_cart'
-          });
-        }
-
-        return json({
-          cart: data.data.cartLinesRemove.cart,
-          action: 'remove_from_cart'
         });
       }
 
@@ -314,27 +136,12 @@ export const action: ActionFunction = async ({ request }) => {
           });
         }
 
-        // Get cart checkout URL
-        const gql = `#graphql
-          query getCart($cartId: ID!) {
-            cart(id: $cartId) {
-              id
-              checkoutUrl
-              totalQuantity
-            }
-          }`;
-
-        const data = await storefrontApiCall(gql, { cartId }, customerAccessToken);
-
-        if (!data.data.cart) {
-          return json({
-            error: 'Cart not found',
-            action: 'begin_checkout'
-          });
-        }
+        // Simple checkout URL generation - no need for complex auth
+        // In a real storefront, this would redirect to the checkout page
+        const checkoutUrl = `${process.env.SHOPIFY_SHOP_DOMAIN ? `https://${process.env.SHOPIFY_SHOP_DOMAIN}` : ''}/cart`;
 
         return json({
-          checkoutUrl: data.data.cart.checkoutUrl,
+          checkoutUrl,
           action: 'begin_checkout'
         });
       }
@@ -358,19 +165,6 @@ export const action: ActionFunction = async ({ request }) => {
             message: 'Order status requires customer authentication'
           },
           action: 'order_status'
-        });
-      }
-
-      case 'get_cart': {
-        const { cartId } = parameters || {};
-        if (!cartId) {
-          return json({ error: 'Cart ID required for get_cart', action: 'get_cart' });
-        }
-        const gql = `#graphql\n          query getCart($id: ID!) {\n            cart(id: $id) {\n              id\n              checkoutUrl\n              totalQuantity\n              lines(first: 20) {\n                edges {\n                  node {\n                    id\n                    quantity\n                    merchandise {\n                      ... on ProductVariant {\n                        id\n                        title\n                        price {\n                          amount\n                          currencyCode\n                        }\n                        product {\n                          title\n                          handle\n                        }\n                      }\n                    }\n                  }\n                }\n              }\n            }\n          }`;
-        const data = await storefrontApiCall(gql, { id: cartId }, customerAccessToken);
-        return json({
-          cart: data.data.cart,
-          action: 'get_cart'
         });
       }
 

@@ -6,7 +6,7 @@ export const action: ActionFunction = async ({ request }) => {
   const { GoogleGenAI } = await import('@google/genai');
 
   // Use the provided Gemini API key directly for now
-  const apiKey = 'AIzaSyAhwxhTJJSMhrTV-FaTHggEGOzuyyp6GpQ';
+  const apiKey = 'AIzaSyCfIoq2Xe3khBj4saX4Sm7kqQYuZTixF3g';
   if (!apiKey) return json({ error: 'Missing Gemini API key' }, { status: 500 });
   const body = await request.json();
   const { messages } = body;
@@ -47,7 +47,7 @@ If there are multiple products, list them as:
 1. image, title, price
 2. image, title, price
 ...and so on.
-\n\nChat history:\n${messages.map((m: { from: string; message: string }) => `${m.from}: ${m.message}`).join('\n')}\n\nRespond ONLY with a single line of valid JSON like {"tool_use": {"name": ..., "parameters": {...}}}.\n\nIMPORTANT:\n- For product search, always use "query_products" as the tool name.\n- For adding to cart, always use "add_to_cart" with parameters: {"cartId": string, "lines": [{"variantId": string, "quantity": number}]} and always assign variantId property value with product name. Do NOT use product_id.\n- For showing, viewing, or displaying the cart, ALWAYS use the tool name "get_cart" with the parameter {"cartId": ...}.\n- Do NOT use "show_cart", "view_cart", or any other tool name for this purpose.\n- For removing items from the cart, always use "remove_from_cart" with parameters: {"cartId": string, "lineIds": [cart line ID(s)]}. The lineIds MUST be the cart line IDs from the cart object, NOT product titles or variant IDs.\n- For checkout always use "begin_checkout" as the tool_name.\n- Do not include any text, markdown, or code blocks before or after the JSON.`;
+\n\nChat history:\n${messages.map((m: { from: string; message: string }) => `${m.from}: ${m.message}`).join('\n')}\n\nRespond ONLY with a single line of valid JSON like {"tool_use": {"name": ..., "parameters": {...}}}.\n\nIMPORTANT:\n- For product search, always use "query_products" as the tool name.\n- For adding to cart, always use "add_to_cart" with parameters: {"cartId": string, "lines": [{"id": string, "quantity": number}]} and always assign id property value with product name. Use ONLY id, never use variantId or product_id.\n- For showing, viewing, or displaying the cart, ALWAYS use the tool name "get_cart" with the parameter {"cartId": ...}.\n- Do NOT use "show_cart", "view_cart", or any other tool name for this purpose.\n- For removing items from the cart, always use "remove_from_cart" with parameters: {"cartId": string, "lineIds": [cart line ID(s)]}. The lineIds MUST be the cart line IDs from the cart object, NOT product titles or variant IDs.\n- For checkout always use "begin_checkout" as the tool_name.\n- Do not include any text, markdown, or code blocks before or after the JSON.`;
   }
 
   const genAI = new GoogleGenAI({ apiKey });

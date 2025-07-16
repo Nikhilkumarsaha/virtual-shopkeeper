@@ -14,6 +14,17 @@ export const action: ActionFunction = async ({ request }) => {
 
     // If cartId is provided, try to fetch the cart
     if (cartId) {
+      console.log('Attempting to fetch cart with ID:', cartId);
+      
+      // Ensure cartId is in the correct Global ID format for Storefront API
+      let formattedCartId = cartId;
+      if (!cartId.startsWith('gid://shopify/Cart/')) {
+        // If it's a numeric ID or token, convert to Global ID format
+        formattedCartId = `gid://shopify/Cart/${cartId}`;
+      }
+      
+      console.log('Using formatted cart ID:', formattedCartId);
+      
       const query = `query getCart($id: ID!) {\n  cart(id: $id) { id checkoutUrl totalQuantity }\n}`;
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -22,12 +33,21 @@ export const action: ActionFunction = async ({ request }) => {
           'X-Shopify-Storefront-Access-Token': storefrontToken,
           ...(customerAccessToken ? { 'Shopify-Storefront-Buyer-Token': customerAccessToken } : {}),
         },
-        body: JSON.stringify({ query, variables: { id: cartId } }),
+        body: JSON.stringify({ query, variables: { id: formattedCartId } }),
       });
       const data = await res.json();
+      
+      console.log('Cart fetch response:', data);
+      
       if (data.data?.cart?.id) {
         return json({ cartId: data.data.cart.id });
       }
+      
+      // If cart fetch failed, log the error for debugging
+      if (data.errors) {
+        console.log('Cart fetch errors:', data.errors);
+      }
+      
       // If cart is not found or invalid, fall through to create a new cart
     }
 
